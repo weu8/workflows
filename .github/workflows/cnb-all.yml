@@ -1,0 +1,71 @@
+name: cnb-all (reusable)
+
+on:
+  # 仅供被调用。触发条件由调用方薄包装定义（schedule / push ai/** / dispatch）
+  workflow_call:
+    inputs:
+      # 必填：上游开源仓库地址（HTTPS）
+      # 例：https://github.com/juanfont/headscale 或 https://github.com/tailscale/headplane
+      upstream_repo:
+        required: true
+        type: string
+
+      # 必填：CNB 仓库地址（HTTPS）
+      # 例：https://cnb.cool/g.h/headscale 或 https://cnb.cool/g.h/headplane
+      cnb_repo_url:
+        required: true
+        type: string
+
+      # 可选：fork 的主分支名；多数仓为 main
+      fork_branch:
+        required: false
+        type: string
+        default: main
+
+      # 可选：是否尝试将 fork/main 快进到 upstream/main（不强推、不改历史）
+      # true = 能快进就推回；false = 跳过快进
+      push_fork_ff:
+        required: false
+        type: boolean
+        default: true
+
+      # 可选：当 fork/main 与 upstream/main 分叉、无法快进时，是否自动开 PR 提醒人工合并
+      open_pr_if_diverged:
+        required: false
+        type: boolean
+        default: true
+
+      # 可选：当 ai/* 的改动成功落到 CNB/main 后，是否自动删除 GitHub 上对应 ai/* 远程分支
+      delete_ai_branch:
+        required: false
+        type: boolean
+        default: true
+
+    secrets:
+      # 必填：CNB 的访问令牌（用户名固定 cnb）
+      # 建议用组织级 Secret：CNB_GH_TOKEN，并在调用方用 `secrets: inherit` 传递
+      CNB_GH_TOKEN:
+        required: true
+
+jobs:
+  # 只在 schedule / workflow_dispatch 触发时执行“同步上游 → fork/main(可快进) → CNB/upstream”
+  sync:
+    if: github.event_name != 'push'
+    uses: weu8/workflows/.github/workflows/cnb-sync.yml@main
+    secrets: inherit
+    with:
+      upstream_repo:       ${{ inputs.upstream_repo }}
+      cnb_repo_url:        ${{ inputs.cnb_repo_url }}
+      fork_branch:         ${{ inputs.fork_branch }}
+      push_fork_ff:        ${{ inputs.push_fork_ff }}
+      open_pr_if_diverged: ${{ inputs.open_pr_if_diverged }}
+
+  # 只在 ai/* push 事件时执行“合并 CNB/upstream + 当前 ai/* → 推 CNB/main（可选删 ai/*）”
+  ai-merge:
+    if: startsWith(github.ref, 'refs/heads/ai/')
+    uses: weu8/workflows/.github/workflows/cnb-ai-merge.yml@main
+    secrets: inherit
+    with:
+      upstream_repo:    ${{ inputs.upstream_repo }}
+      cnb_repo_url:     ${{ inputs.cnb_repo_url }}
+      delete_ai_branch: ${{ inputs.delete_ai_branch }}
