@@ -1,36 +1,44 @@
 name: cnb-all (reusable)
 
 on:
+  # 仅供被调用；触发条件交由调用方薄包装定义（schedule / push ai/** / dispatch）
   workflow_call:
     inputs:
-      upstream_repo:          # 必填：上游仓 HTTPS
+      # 必填：上游仓 HTTPS
+      upstream_repo:
         required: true
         type: string
-      cnb_repo_url:           # 必填：CNB 仓 HTTPS
+      # 必填：CNB 仓 HTTPS
+      cnb_repo_url:
         required: true
         type: string
-      fork_branch:            # 可选：fork 主分支名
+      # 可选：fork 主分支名（多数为 main）
+      fork_branch:
         required: false
         type: string
         default: main
-      push_fork_ff:           # 可选：是否快进 fork/main
+      # 可选：是否快进 fork/main 到 upstream/main（不强推）
+      push_fork_ff:
         required: false
         type: boolean
         default: true
-      open_pr_if_diverged:    # 可选：分叉时是否开 PR
+      # 可选：快进失败是否自动开 PR
+      open_pr_if_diverged:
         required: false
         type: boolean
         default: true
-      delete_ai_branch:       # 可选：成功后删除 ai/* 远端分支
+      # 可选：AI 合并成功后是否删除 GitHub 远端的 ai/* 分支
+      delete_ai_branch:
         required: false
         type: boolean
         default: true
     secrets:
+      # 必填：CNB 的访问令牌（用户名固定 cnb）
       CNB_GH_TOKEN:
         required: true
 
 jobs:
-  # 只在 schedule / workflow_dispatch 时执行
+  # 只在 schedule / workflow_dispatch 时跑（push 事件不跑，避免冗余）
   sync:
     if: github.event_name != 'push'
     uses: weu8/workflows/.github/workflows/cnb-sync.yml@main
@@ -42,9 +50,11 @@ jobs:
       push_fork_ff:        ${{ inputs.push_fork_ff }}
       open_pr_if_diverged: ${{ inputs.open_pr_if_diverged }}
 
-  # 只在 ai/* push 时执行
+  # 在两种情况下执行 AI 合并：
+  # 1) push 到 ai/* 分支
+  # 2) 手动触发（workflow_dispatch）
   ai-merge:
-    if: startsWith(github.ref, 'refs/heads/ai/')
+    if: startsWith(github.ref, 'refs/heads/ai/') || github.event_name == 'workflow_dispatch'
     uses: weu8/workflows/.github/workflows/cnb-ai-merge.yml@main
     secrets: inherit
     with:
