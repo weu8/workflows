@@ -38,6 +38,15 @@ on:
         required: true
 
 jobs:
+  # 在两种情况下执行 AI 合并： 1) push 到 ai/* 分支 2) 手动触发（workflow_dispatch）
+  ai-merge:
+    if: startsWith(github.ref, 'refs/heads/ai/') || github.event_name == 'workflow_dispatch'
+    uses: weu8/workflows/.github/workflows/cnb-ai-merge.yml@main
+    secrets: inherit
+    with:
+      upstream_repo:    ${{ inputs.upstream_repo }}
+      cnb_repo_url:     ${{ inputs.cnb_repo_url }}
+      delete_ai_branch: ${{ inputs.delete_ai_branch }}
   # 只在 schedule / workflow_dispatch 时跑（push 事件不跑，避免冗余）
   sync:
     if: github.event_name != 'push'
@@ -49,15 +58,3 @@ jobs:
       fork_branch:         ${{ inputs.fork_branch }}
       push_fork_ff:        ${{ inputs.push_fork_ff }}
       open_pr_if_diverged: ${{ inputs.open_pr_if_diverged }}
-
-  # 在两种情况下执行 AI 合并：
-  # 1) push 到 ai/* 分支
-  # 2) 手动触发（workflow_dispatch）
-  ai-merge:
-    if: startsWith(github.ref, 'refs/heads/ai/') || github.event_name == 'workflow_dispatch'
-    uses: weu8/workflows/.github/workflows/cnb-ai-merge.yml@main
-    secrets: inherit
-    with:
-      upstream_repo:    ${{ inputs.upstream_repo }}
-      cnb_repo_url:     ${{ inputs.cnb_repo_url }}
-      delete_ai_branch: ${{ inputs.delete_ai_branch }}
