@@ -1,0 +1,80 @@
+name: cnb-ai-merge (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      upstream_repo:       # 例：https://github.com/tailscale/headplane
+        required: true
+        type: string
+      cnb_repo_url:        # 例：https://cnb.cool/g.h/headplane
+        required: true
+        type: string
+      delete_ai_branch:    # 成功后是否删除 GitHub 远端 ai/* 分支
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      CNB_GH_TOKEN:
+        required: true
+
+jobs:
+  merge-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Prepare remotes
+        env: { CNB_GH_TOKEN: ${{ secrets.CNB_GH_TOKEN }} }
+        run: |
+          set -e
+          git remote add upstream "${{ inputs.upstream_repo }}" || true
+          git fetch upstream --prune
+          CNB_URL="https://cnb:${CNB_GH_TOKEN}@${{ inputs.cnb_repo_url#https:// }}"
+          git remote add cnb "${CNB_URL}" || true
+          git fetch cnb --prune
+
+      - name: Start from CNB main or upstream main
+        run: |
+          set -e
+          if git ls-remote --heads cnb main | grep -q main; then
+            git checkout -b cnbr-main cnb/main
+          else
+            git checkout -b cnbr-main upstream/main
+          fi
+
+      - name: Merge CNB upstream then AI branch
+        run: |
+          set -e
+          if git ls-remote --heads cnb upstream | grep -q upstream; then
+            git pull --no-edit cnb upstream
+          else
+            git pull --no-edit upstream main
+          fi
+          AI_BRANCH="$(git rev-parse --abbrev-ref "${GITHUB_REF#refs/heads/}")"
+          # 如果是手动触发，AI_BRANCH 可能不是 ai/*；退化为当前检出分支名
+          if [ -z "$AI_BRANCH" ]; then AI_BRANCH="$(git rev-parse --abbrev-ref HEAD)"; fi
+          git merge --no-ff --no-edit "$AI_BRANCH"
+
+      - name: Push to CNB main
+        id: push_cnb
+        env: { CNB_GH_TOKEN: ${{ secrets.CNB_GH_TOKEN }} }
+        run: |
+          set -e
+          NEW_HEAD="$(git rev-parse HEAD)"
+          echo "new_head=${NEW_HEAD}" >> "$GITHUB_OUTPUT"
+          git push "https://${{ inputs.cnb_repo_url#https:// }}" HEAD:main
+
+      - name: Verify CNB/main advanced
+        id: verify
+        env: { CNB_GH_TOKEN: ${{ secrets.CNB_GH_TOKEN }} }
+        run: |
+          set -e
+          REMOTE_SHA="$(git ls-remote https://cnb:${CNB_GH_TOKEN}@${{ inputs.cnb_repo_url#https:// }} refs/heads/main | awk '{print $1}')"
+          echo "cnb_head=${REMOTE_SHA}" >> "$GITHUB_OUTPUT"
+          test "$REMOTE_SHA" = "${{ steps.push_cnb.outputs.new_head }}"
+
+      - name: Delete GitHub ai/* branch (remote)
+        if: ${{ inputs.delete_ai_branch && startsWith(github.ref, 'refs/heads/ai/') && success() }}
+        run: |
+          git push origin :${GITHUB_REF#refs/heads/}
