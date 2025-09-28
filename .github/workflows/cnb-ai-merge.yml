@@ -12,7 +12,7 @@ on:
       delete_ai_branch:     # 可选：推送成功后删除 GitHub 远端 ai/* 分支
         required: false
         type: boolean
-        default: true
+        default: false
     secrets:
       CNB_GH_TOKEN:         # 必填：对 CNB 有写入权限的令牌
         required: true
