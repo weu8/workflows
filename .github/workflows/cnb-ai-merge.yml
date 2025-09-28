@@ -94,7 +94,14 @@ jobs:
             git pull --no-edit upstream main
           fi
           # 合并触发的 ai/* 本地分支，保留一次“AI 投递”的合并节点
-          git merge --no-ff --no-edit "${{ steps.detect.outputs.ai_branch }}"
+          # 解决合并冲突：优先使用 AI 分支的内容
+          git merge --no-ff --no-edit -X theirs "${{ steps.detect.outputs.ai_branch }}" || {
+            echo "::warning::merge had conflicts, auto-resolving by preferring AI branch"
+            # 如果合并仍然失败，自动解决冲突，优先使用 AI 侧的内容
+            git checkout --theirs .
+            git add -A
+            git commit -m "chore(ci): auto-resolve conflicts, prefer AI branch"
+          }
 
       # 7) 推前打“只增不改”的快照 tag（用于回溯/对比；不污染分支列表，可选但推荐）
       - name: Tag snapshot (immutable)
