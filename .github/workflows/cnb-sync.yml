@@ -58,7 +58,7 @@ jobs:
           fi
 
       - name: Create PR to sync upstream → fork/main
-        if: ${{ inputs.open_pr_if_diverged && steps.ff.outputs.ff == 'ff=skip' }}
+        if: ${{ inputs.open_pr_if_diverged && steps.ff.outputs.ff == 'skip' }}
         uses: peter-evans/create-pull-request@v6
         with:
           branch: chore/sync-upstream-to-${{ inputs.fork_branch }}
