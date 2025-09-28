@@ -138,7 +138,7 @@ jobs:
           test "$REMOTE_SHA" = "${{ steps.push_cnb.outputs.new_head }}"
 
       # 10) 可选：删除 GitHub 远端 ai/*（仅在本次成功后）
-      - name: Delete GitHub ai/* branch (remote)
-        if: ${{ inputs.delete_ai_branch == true && startsWith(github.ref, 'refs/heads/ai/') && success() }}
-        run: |
-          git push origin :${{ steps.detect.outputs.ai_branch }}
+#      - name: Delete GitHub ai/* branch (remote)
+#        if: ${{ inputs.delete_ai_branch == true && startsWith(github.ref, 'refs/heads/ai/') && success() }}
+#        run: |
+#          git push origin :${{ steps.detect.outputs.ai_branch }}
